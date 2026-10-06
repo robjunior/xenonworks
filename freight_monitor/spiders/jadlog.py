@@ -10,45 +10,9 @@ requiring Jadlog API credentials.
 """
 
 import hashlib
-import json
 import scrapy
-from scrapy.loader import ItemLoader
-from itemloaders.processors import TakeFirst
 
 from freight_monitor.contracts import ShippingQuote
-
-
-class JadlogQuoteItem(scrapy.Item):
-    """Internal Scrapy item for Jadlog spider."""
-    provider = scrapy.Field()
-    service = scrapy.Field()
-    price = scrapy.Field()
-    delivery_time = scrapy.Field()
-    currency = scrapy.Field()
-    available = scrapy.Field()
-
-
-def clean_price(value):
-    """Clean and convert price string to float."""
-    if value is None:
-        return None
-    value = str(value).replace("R$", "").strip()
-    value = value.replace(".", "").replace(",", ".")
-    try:
-        return float(value)
-    except ValueError:
-        return None
-
-
-def clean_delivery_time(value):
-    """Clean and convert delivery time to int or None."""
-    if value is None:
-        return None
-    import re
-    match = re.search(r"(\d+)", str(value))
-    if match:
-        return int(match.group(1))
-    return None
 
 
 class JadlogSpider(scrapy.Spider):
@@ -73,19 +37,21 @@ class JadlogSpider(scrapy.Spider):
 
     def start_requests(self):
         """Generate request - Jadlog uses mock data, no real API call needed."""
-        # For demonstration, we yield a mock request that triggers the
-        # parse method with mock data. In a real implementation, this
-        # would make an actual API request to Jadlog.
         self.logger.info("Jadlog spider: using mock data (no real API call)")
 
-        # Yield a simple request that will trigger parse with mock data
-        # The parse method uses _get_mock_quotes() to generate data
-        yield {
-            "mock": True,
-            "origin_cep": self.origin_cep,
-            "dest_cep": self.dest_cep,
-            "weight": self.weight,
-        }
+        # Yield a request that will trigger parse with mock data
+        # In a real implementation, this would make an actual API request to Jadlog
+        url = self.start_urls[0] if self.start_urls else "https://jadlog.com.br"
+        yield scrapy.Request(
+            url=url,
+            callback=self.parse,
+            meta={
+                "origin_cep": self.origin_cep,
+                "dest_cep": self.dest_cep,
+                "weight": self.weight,
+            },
+            dont_filter=True,
+        )
 
     def parse(self, response):
         """Parse the Jadlog response and extract shipping quotes.
@@ -93,21 +59,13 @@ class JadlogSpider(scrapy.Spider):
         This is the standard pattern all shipping spiders follow:
         1. Receive Response (or mock data)
         2. Extract raw data (mock or API)
-        3. Normalize via ItemLoader -> JadlogQuoteItem
-        4. Also yield ShippingQuote contract entity
-        5. Return JadlogQuoteItem(s)
+        3. Yield ShippingQuote contract entities
         """
         self.logger.info("Processing Jadlog request: %s -> %s",
                         self.origin_cep, self.dest_cep)
 
-        # Check if this is a mock request
-        if response.url.endswith("jadlog.com.br"):
-            # Real website - would parse actual response
-            # For now, use mock data
-            quotes = self._get_mock_quotes()
-        else:
-            # Mock request - response will be minimal
-            quotes = self._get_mock_quotes()
+        # Use mock data - in real implementation would parse API response
+        quotes = self._get_mock_quotes()
 
         for quote_dict in quotes:
             # Convert dict to ShippingQuote contract entity
@@ -121,16 +79,6 @@ class JadlogSpider(scrapy.Spider):
                 tracking_number=quote_dict.get("tracking_number"),
             )
 
-            # Also yield the Scrapy Item for framework compatibility
-            loader = ItemLoader(item=JadlogQuoteItem())
-            loader.add_value("provider", quote.provider)
-            loader.add_value("service", quote.service)
-            loader.add_value("price", quote.price)
-            loader.add_value("delivery_time", quote.delivery_time)
-            loader.add_value("currency", quote.currency)
-            loader.add_value("available", quote.available)
-            loader.add_value("tracking_number", quote.tracking_number)
-            yield loader.load_item()
             yield quote
 
     def _get_mock_quotes(self):
