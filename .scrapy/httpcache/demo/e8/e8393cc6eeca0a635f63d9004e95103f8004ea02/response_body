@@ -1,0 +1,13 @@
+{
+  "args": {}, 
+  "headers": {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", 
+    "Accept-Encoding": "gzip, deflate, br, zstd", 
+    "Accept-Language": "en", 
+    "Host": "httpbin.org", 
+    "User-Agent": "steam-monitor/0.1 (project for study; contact: your-email@exemplo.com)", 
+    "X-Amzn-Trace-Id": "Root=1-6ac51da5-4297232d79a1559d648c2e9b"
+  }, 
+  "origin": "191.240.216.164", 
+  "url": "https://httpbin.org/get"
+}
