@@ -1,3 +1,4 @@
+import os
 # Scrapy settings for steam_monitor project
 #
 # For simplicity, this file only contains the most important or commonly
