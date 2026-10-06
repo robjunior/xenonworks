@@ -8,7 +8,7 @@ the most barato and mais rapido options.
 Conformes ao contrato: freight_monitor.contracts.ShippingQuote
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 
 
 class ShippingAggregator:
@@ -35,12 +35,7 @@ class ShippingAggregator:
         self.errors: Dict[str, List] = {}
 
     def add_provider_results(self, provider: str, quotes: List):
-        """Add results from a specific provider.
-
-        Args:
-            provider: Provider name (e.g., "correios", "jadlog")
-            quotes: List of ShippingQuote objects/dicts
-        """
+        """Add results from a specific provider."""
         if provider not in self.results:
             self.results[provider] = []
         self.results[provider].extend(quotes)
@@ -48,40 +43,51 @@ class ShippingAggregator:
     def collect_all(self, all_quotes: List[Dict[str, Any]]):
         """Collect all quotes from multiple sources.
 
-        Args:
-            all_quotes: Flat list of quote dicts with 'provider' field
+        Accepts both Scrapy Item format (with list-valued fields) and
+        plain dict format. Normalizes provider field to string.
         """
         for quote in all_quotes:
-            provider = quote.get("provider", "unknown")
+            # Handle Scrapy Item format where fields may be lists
+            if isinstance(quote, dict):
+                # Extract provider - handle both string and list format
+                provider_val = quote.get("provider", quote.get("provider", ["unknown"])[0] if isinstance(quote.get("provider"), list) else quote.get("provider", "unknown"))
+                if isinstance(provider_val, list):
+                    provider = provider_val[0] if provider_val else "unknown"
+                else:
+                    provider = str(provider_val)
+            else:
+                provider = str(quote) if quote else "unknown"
+
             if provider not in self.results:
                 self.results[provider] = []
             self.results[provider].append(quote)
 
     def aggregate(self) -> Dict[str, Any]:
-        """Aggregate and rank all collected quotes.
-
-        Returns a structured result with:
-        - Most barato option
-        - Mais rapido option
-        - All options ordered by price
-        - All options ordered by delivery time
-        - Per-provider summaries
-        - Individual errors
-
-        Returns:
-            Dict with aggregated results.
-        """
+        """Aggregate and rank all collected quotes."""
         all_quotes = []
         self.errors = {}
 
-        # Collect quotes from all providers
         for provider, quotes in self.results.items():
             provider_quotes = []
             provider_errors = []
 
             for quote in quotes:
-                # Normalize to dict if it's a ShippingQuote object
-                if hasattr(quote, '__dict__'):
+                # Normalize to dict if needed
+                if isinstance(quote, dict):
+                    # Check if Scrapy Item format (fields are lists)
+                    if any(isinstance(quote.get(k), list) for k in
+                           ['provider', 'service', 'price', 'delivery_time']
+                           if k in quote):
+                        quote_dict = {}
+                        for k in ['provider', 'service', 'price', 'delivery_time',
+                                  'currency', 'available', 'tracking_number']:
+                            if k in quote and quote[k]:
+                                quote_dict[k] = quote[k][0] if isinstance(quote[k], list) else quote[k]
+                            else:
+                                quote_dict[k] = None
+                    else:
+                        quote_dict = dict(quote) if isinstance(quote, dict) else {}
+                elif hasattr(quote, '__dict__'):
                     quote_dict = {
                         'provider': quote.provider,
                         'service': quote.service,
@@ -94,11 +100,9 @@ class ShippingAggregator:
                 else:
                     quote_dict = dict(quote) if isinstance(quote, dict) else {}
 
-                # Validate required fields
+                # Validate provider
                 if not quote_dict.get("provider"):
-                    provider_errors.append(
-                        f"Quote missing provider field: {quote}"
-                    )
+                    provider_errors.append(f"Quote missing provider: {quote}")
                     continue
 
                 # Validate price
@@ -106,9 +110,7 @@ class ShippingAggregator:
                     try:
                         quote_dict["price"] = float(quote_dict["price"])
                     except (ValueError, TypeError):
-                        provider_errors.append(
-                            f"Invalid price for {provider}"
-                        )
+                        provider_errors.append(f"Invalid price for {provider}")
                         continue
 
                 # Validate delivery_time
@@ -116,9 +118,7 @@ class ShippingAggregator:
                     try:
                         quote_dict["delivery_time"] = int(quote_dict["delivery_time"])
                     except (ValueError, TypeError):
-                        provider_errors.append(
-                            f"Invalid delivery_time for {provider}"
-                        )
+                        provider_errors.append(f"Invalid delivery_time for {provider}")
                         continue
 
                 all_quotes.append(quote_dict)
@@ -147,13 +147,13 @@ class ShippingAggregator:
         # Filter only available quotes
         available_quotes = [q for q in all_quotes if q.get("available", False)]
 
-        # Identify the most barato (lowest price among available)
+        # Most barato (lowest price among available)
         mais_barato = min(
             available_quotes,
             key=lambda x: x.get("price", float("inf")) or float("inf")
         ) if available_quotes else None
 
-        # Identify the mais rapido (shortest delivery among available)
+        # Mais rapido (shortest delivery among available)
         mais_rapido = min(
             available_quotes,
             key=lambda x: x.get("delivery_time", float("inf")) or float("inf")
@@ -183,7 +183,7 @@ class ShippingAggregator:
         }
 
     def _empty_result(self) -> Dict[str, Any]:
-        """Return a result structure when no quotes are available."""
+        """Return result structure when no quotes available."""
         return {
             "melhor_opcao": None,
             "mais_rapido": None,
@@ -203,8 +203,8 @@ class ShippingAggregator:
         por_prazo,
         por_provedor,
     ) -> str:
-        """Generate a human-readable summary string."""
-        lines: List[str] = []
+        """Generate human-readable summary string."""
+        lines = []
 
         if mais_barato:
             price_str = f"R$ {mais_barato['price']:.2f}" if mais_barato.get('price') else "Indisponivel"
@@ -230,7 +230,7 @@ class ShippingAggregator:
 
         lines.append("")
         lines.append("Por preco (crescente):")
-        for q in por_preco[:5]:  # Top 5
+        for q in por_preco[:5]:
             price_val = q.get("price")
             price_str = f"R$ {price_val:.2f}" if price_val is not None else "Indisponivel"
             lines.append(
@@ -240,7 +240,7 @@ class ShippingAggregator:
 
         lines.append("")
         lines.append("Por prazo (crescente):")
-        for q in por_prazo[:5]:  # Top 5
+        for q in por_prazo[:5]:
             time_str = f"{q.get('delivery_time', 'N/A')} dias"
             price_val = q.get("price")
             price_str = f"R$ {price_val:.2f}" if price_val is not None else "Indisponivel"

@@ -154,10 +154,6 @@ HTTPCACHE_EXPIRATION_SECS = 6 * 3600
 # In pipelines, read with crawler.settings.get("DATABASE_URL").
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
-# Steam country setting (default: "br")
-
-# Steam language setting (default: "portuguese")
-
 # --- Downloader Middlewares -----------------------------------------------
 # Enable and configure downloader middlewares
 # See: https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
