@@ -5,6 +5,9 @@ Aggregates shipping quotes from multiple providers (spiders),
 eliminates invalid results, orders by price, and identifies
 the cheapest and fastest options.
 
+Also supports: best value (balance of price + delivery),
+per-provider statistics, and price/prazo filtering.
+
 Conforms to contract: freight_monitor.contracts.ShippingQuote
 """
 
@@ -52,8 +55,35 @@ class ShippingAggregator:
                 self.results[provider] = []
             self.results[provider].append(quote)
 
-    def aggregate(self) -> Dict[str, Any]:
-        """Aggregate and rank all collected quotes."""
+    def aggregate(
+        self,
+        filter_min_price: float = None,
+        filter_max_price: float = None,
+        filter_min_delivery: int = None,
+        filter_max_delivery: int = None,
+    ) -> Dict[str, Any]:
+        """Aggregate and rank all collected quotes.
+
+        Args:
+            filter_min_price: Only include quotes with price >= this value
+            filter_max_price: Only include quotes with price <= this value
+            filter_min_delivery: Only include quotes with delivery_time >= this value
+            filter_max_delivery: Only include quotes with delivery_time <= this value
+
+        Returns:
+            Dict with aggregated results following the structure:
+            {
+                "cheapest_option": ShippingQuote,
+                "fastest_option": ShippingQuote,
+                "best_value_option": ShippingQuote,  # Balance of price + delivery
+                "all_options": List[ShippingQuote],
+                "by_price": List[ShippingQuote],
+                "by_delivery_time": List[ShippingQuote],
+                "by_provider": Dict[str, Dict[str, Any]],
+                "errors": Dict[str, List],
+                "summary": str
+            }
+        """
         all_quotes = []
         self.errors = {}
 
@@ -116,6 +146,18 @@ class ShippingAggregator:
                             f"Invalid delivery_time for {provider}")
                         continue
 
+                # Apply price filters
+                if filter_min_price is not None and quote_dict.get("price", 0) < filter_min_price:
+                    continue
+                if filter_max_price is not None and quote_dict.get("price", float("inf")) > filter_max_price:
+                    continue
+
+                # Apply delivery time filters
+                if filter_min_delivery is not None and quote_dict.get("delivery_time", 0) < filter_min_delivery:
+                    continue
+                if filter_max_delivery is not None and quote_dict.get("delivery_time", float("inf")) > filter_max_delivery:
+                    continue
+
                 all_quotes.append(quote_dict)
                 provider_quotes.append(quote_dict)
 
@@ -125,7 +167,8 @@ class ShippingAggregator:
             self.results[provider] = provider_quotes
 
         if not all_quotes:
-            return self._empty_result()
+            return self._empty_result(
+                filter_min_price, filter_max_price, filter_min_delivery, filter_max_delivery)
 
         # Order by price (ascending)
         por_preco = sorted(
@@ -153,6 +196,20 @@ class ShippingAggregator:
             key=lambda x: x.get("delivery_time", float("inf")) or float("inf")
         ) if available_quotes else None
 
+        # Best value: balance of lowest price and shortest delivery
+        # Score = price/delivery_time (lower is better)
+        # Handle division by zero
+        scored_quotes = []
+        for q in available_quotes:
+            price = q.get("price", 0) or 0.01  # Avoid div by zero
+            delivery = q.get("delivery_time", 1) or 1  # Avoid div by zero
+            score = price / delivery  # Lower score = better value
+            scored_quotes.append((score, q))
+
+        # Sort by score (ascending = better value)
+        scored_quotes.sort(key=lambda x: x[0])
+        melhor_valor = scored_quotes[0][1] if scored_quotes else None
+
         # Per-provider summaries
         por_provedor = {}
         for provider, quotes in self.results.items():
@@ -162,25 +219,47 @@ class ShippingAggregator:
                 "total": len(quotes),
                 "available": len(provider_available),
                 "quotes": provider_available,
+                "avg_price": self._calc_avg_price(provider_available),
+                "avg_delivery": self._calc_avg_delivery(provider_available),
             }
 
         return {
             "cheapest_option": mais_barato,
             "fastest_option": mais_rapido,
+            "best_value_option": melhor_valor,
             "all_options": all_quotes,
             "by_price": por_preco,
             "by_delivery_time": por_prazo,
             "by_provider": por_provedor,
             "errors": self.errors,
             "summary": self._generate_summary(
-                mais_barato, mais_rapido, por_preco, por_prazo, por_provedor),
+                mais_barato, mais_rapido, melhor_valor, por_preco, por_prazo, por_provedor,
+                filter_min_price, filter_max_price, filter_min_delivery, filter_max_delivery),
         }
 
-    def _empty_result(self) -> Dict[str, Any]:
+    @staticmethod
+    def _calc_avg_price(quotes: List[Dict]) -> float:
+        """Calculate average price for a list of quotes."""
+        if not quotes:
+            return 0.0
+        total = sum(q.get("price", 0) or 0 for q in quotes)
+        return round(total / len(quotes), 2)
+
+    @staticmethod
+    def _calc_avg_delivery(quotes: List[Dict]) -> int:
+        """Calculate average delivery time for a list of quotes."""
+        if not quotes:
+            return 0
+        total = sum(q.get("delivery_time", 0) or 0 for q in quotes)
+        return round(total / len(quotes))
+
+    def _empty_result(self, filter_min_price=None, filter_max_price=None,
+                      filter_min_delivery=None, filter_max_delivery=None) -> Dict[str, Any]:
         """Return result structure when no quotes available."""
         return {
             "cheapest_option": None,
             "fastest_option": None,
+            "best_value_option": None,
             "all_options": [],
             "by_price": [],
             "by_delivery_time": [],
@@ -193,9 +272,14 @@ class ShippingAggregator:
         self,
         cheapest_option,
         fastest_option,
+        best_value_option,
         by_price,
         by_delivery_time,
         by_provider,
+        filter_min_price=None,
+        filter_max_price=None,
+        filter_min_delivery=None,
+        filter_max_delivery=None,
     ) -> str:
         """Generate human-readable summary string."""
         lines: List[str] = []
@@ -224,6 +308,32 @@ class ShippingAggregator:
         else:
             lines.append("Fastest: None available")
 
+        if best_value_option:
+            price_str = (
+                f"R$ {best_value_option['price']:.2f}"
+                if best_value_option.get('price') else "Unavailable")
+            time_str = best_value_option.get('delivery_time', 'N/A')
+            lines.append(
+                f"Best Value: {best_value_option['provider']} - "
+                f"{best_value_option['service']} - "
+                f"{price_str} - {time_str} days (optimal price/delivery balance)")
+        else:
+            lines.append("Best Value: None available")
+
+        lines.append("")
+        # Filter info
+        filter_parts = []
+        if filter_min_price is not None:
+            filter_parts.append(f"min price R${filter_min_price:.2f}")
+        if filter_max_price is not None:
+            filter_parts.append(f"max price R${filter_max_price:.2f}")
+        if filter_min_delivery is not None:
+            filter_parts.append(f"min delivery {filter_min_delivery}d")
+        if filter_max_delivery is not None:
+            filter_parts.append(f"max delivery {filter_max_delivery}d")
+        if filter_parts:
+            lines.append(f"Filtered: {' | '.join(filter_parts)}")
+
         lines.append("")
         lines.append("By price (ascending):")
         for q in by_price[:5]:  # Top 5
@@ -250,6 +360,7 @@ class ShippingAggregator:
                 f"({data['available']} available)"
                 if data['available'] > 0 else "(not available)")
             lines.append(
-                f"  - {provider}: {data['total']} total {available_str}")
+                f"  - {provider}: {data['total']} total ({data['avg_price']:.2f}R$ avg, "
+                f"{data['avg_delivery']:.1f}d avg) {available_str}")
 
         return "\n".join(lines)
