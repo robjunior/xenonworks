@@ -10,11 +10,14 @@ without requiring third-party API credentials.
 """
 
 import hashlib
+import scrapy
 from freight_monitor.contracts import ShippingQuote
 
 
-class ThirdPartySpider:
+class ThirdPartySpider(scrapy.Spider):
     """Spider for querying third-party shipping rates."""
+
+    name = "third_party"
 
     def __init__(self, origin_cep=None, dest_cep=None, weight=None,
                  service_code=None):
