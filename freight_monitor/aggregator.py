@@ -2,27 +2,17 @@
 Freight aggregator for freight_monitor project.
 
 Aggregates shipping quotes from multiple providers (spiders),
-eliminates invalid results, orders by price/prazo, and identifies
-the most barato and mais rapido options.
+eliminates invalid results, orders by price, and identifies
+the cheapest and fastest options.
 
-Conformes ao contrato: freight_monitor.contracts.ShippingQuote
+Conforms to contract: freight_monitor.contracts.ShippingQuote
 """
 
 from typing import List, Dict, Any
 
 
 class ShippingAggregator:
-    """Aggregates shipping quotes from multiple providers.
-
-    Responsibilities:
-    - Execute multiple shipping providers (spiders)
-    - Collect and normalize results
-    - Eliminate invalid/undesired results
-    - Order by price (crescente) and prazo (crescente)
-    - Identify the most barato option
-    - Identify the mais rapido option
-    - Maintain erros individuais (nao bloqueiam o resultado)
-    """
+    """Aggregates shipping quotes from multiple providers."""
 
     def __init__(self, providers: List[str] = None):
         """Initialize the aggregator.
@@ -82,7 +72,8 @@ class ShippingAggregator:
                         for k in ['provider', 'service', 'price', 'delivery_time',
                                   'currency', 'available', 'tracking_number']:
                             if k in quote and quote[k]:
-                                quote_dict[k] = quote[k][0] if isinstance(quote[k], list) else quote[k]
+                                quote_dict[k] = quote[k][0] \
+                                    if isinstance(quote[k], list) else quote[k]
                             else:
                                 quote_dict[k] = None
                     else:
@@ -102,7 +93,8 @@ class ShippingAggregator:
 
                 # Validate provider
                 if not quote_dict.get("provider"):
-                    provider_errors.append(f"Quote missing provider: {quote}")
+                    provider_errors.append(
+                        f"Quote missing provider: {quote}")
                     continue
 
                 # Validate price
@@ -110,15 +102,18 @@ class ShippingAggregator:
                     try:
                         quote_dict["price"] = float(quote_dict["price"])
                     except (ValueError, TypeError):
-                        provider_errors.append(f"Invalid price for {provider}")
+                        provider_errors.append(
+                            f"Invalid price for {provider}")
                         continue
 
                 # Validate delivery_time
                 if quote_dict.get("delivery_time") is not None:
                     try:
-                        quote_dict["delivery_time"] = int(quote_dict["delivery_time"])
+                        quote_dict["delivery_time"] = int(
+                            quote_dict["delivery_time"])
                     except (ValueError, TypeError):
-                        provider_errors.append(f"Invalid delivery_time for {provider}")
+                        provider_errors.append(
+                            f"Invalid delivery_time for {provider}")
                         continue
 
                 all_quotes.append(quote_dict)
@@ -132,28 +127,27 @@ class ShippingAggregator:
         if not all_quotes:
             return self._empty_result()
 
-        # Order by price (crescente)
+        # Order by price (ascending)
         por_preco = sorted(
             all_quotes,
-            key=lambda x: x.get("price", float("inf")) or float("inf")
-        )
+            key=lambda x: x.get("price", float("inf")) or float("inf"))
 
-        # Order by delivery time (crescente)
+        # Order by delivery time (ascending)
         por_prazo = sorted(
             all_quotes,
-            key=lambda x: x.get("delivery_time", float("inf")) or float("inf")
-        )
+            key=lambda x: x.get("delivery_time", float("inf")) or float("inf"))
 
         # Filter only available quotes
-        available_quotes = [q for q in all_quotes if q.get("available", False)]
+        available_quotes = [q for q in all_quotes
+                           if q.get("available", False)]
 
-        # Most barato (lowest price among available)
+        # Cheapest (lowest price among available)
         mais_barato = min(
             available_quotes,
             key=lambda x: x.get("price", float("inf")) or float("inf")
         ) if available_quotes else None
 
-        # Mais rapido (shortest delivery among available)
+        # Fastest (shortest delivery among available)
         mais_rapido = min(
             available_quotes,
             key=lambda x: x.get("delivery_time", float("inf")) or float("inf")
@@ -162,7 +156,8 @@ class ShippingAggregator:
         # Per-provider summaries
         por_provedor = {}
         for provider, quotes in self.results.items():
-            provider_available = [q for q in quotes if q.get("available", False)]
+            provider_available = [q for q in quotes
+                                  if q.get("available", False)]
             por_provedor[provider] = {
                 "total": len(quotes),
                 "available": len(provider_available),
@@ -170,91 +165,91 @@ class ShippingAggregator:
             }
 
         return {
-            "melhor_opcao": mais_barato,
-            "mais_rapido": mais_rapido,
-            "todas_as_opcoes": all_quotes,
-            "por_preco": por_preco,
-            "por_prazo": por_prazo,
-            "por_provedor": por_provedor,
-            "erros": self.errors,
-            "resumo": self._generate_summary(
-                mais_barato, mais_rapido, por_preco, por_prazo, por_provedor
-            ),
+            "cheapest_option": mais_barato,
+            "fastest_option": mais_rapido,
+            "all_options": all_quotes,
+            "by_price": por_preco,
+            "by_delivery_time": por_prazo,
+            "by_provider": por_provedor,
+            "errors": self.errors,
+            "summary": self._generate_summary(
+                mais_barato, mais_rapido, por_preco, por_prazo, por_provedor),
         }
 
     def _empty_result(self) -> Dict[str, Any]:
         """Return result structure when no quotes available."""
         return {
-            "melhor_opcao": None,
-            "mais_rapido": None,
-            "todas_as_opcoes": [],
-            "por_preco": [],
-            "por_prazo": [],
-            "por_provedor": {},
-            "erros": {"global": "Nenhum orcamento disponivel"},
-            "resumo": "Nenhum frete disponivel para os CEPs e dimensoes informados.",
+            "cheapest_option": None,
+            "fastest_option": None,
+            "all_options": [],
+            "by_price": [],
+            "by_delivery_time": [],
+            "by_provider": {},
+            "errors": {"global": "No quotes available"},
+            "summary": "No freight available for the provided CEPs and dimensions.",
         }
 
     def _generate_summary(
         self,
-        mais_barato,
-        mais_rapido,
-        por_preco,
-        por_prazo,
-        por_provedor,
+        cheapest_option,
+        fastest_option,
+        by_price,
+        by_delivery_time,
+        by_provider,
     ) -> str:
         """Generate human-readable summary string."""
-        lines = []
+        lines: List[str] = []
 
-        if mais_barato:
-            price_str = f"R$ {mais_barato['price']:.2f}" if mais_barato.get('price') else "Indisponivel"
+        if cheapest_option:
+            price_str = (
+                f"R$ {cheapest_option['price']:.2f}"
+                if cheapest_option.get('price') else "Unavailable")
             lines.append(
-                f"Mais barato: {mais_barato['provider']} - "
-                f"{mais_barato['service']} - "
+                f"Cheapest: {cheapest_option['provider']} - "
+                f"{cheapest_option['service']} - "
                 f"{price_str} - "
-                f"{mais_barato['delivery_time']} dias"
-            )
+                f"{cheapest_option['delivery_time']} days")
         else:
-            lines.append("Mais barato: Nenhum disponivel")
+            lines.append("Cheapest: None available")
 
-        if mais_rapido:
-            price_str = f"R$ {mais_rapido['price']:.2f}" if mais_rapido.get('price') else "Indisponivel"
+        if fastest_option:
+            price_str = (
+                f"R$ {fastest_option['price']:.2f}"
+                if fastest_option.get('price') else "Unavailable")
             lines.append(
-                f"Mais rapido: {mais_rapido['provider']} - "
-                f"{mais_rapido['service']} - "
+                f"Fastest: {fastest_option['provider']} - "
+                f"{fastest_option['service']} - "
                 f"{price_str} - "
-                f"{mais_rapido['delivery_time']} dias"
-            )
+                f"{fastest_option['delivery_time']} days")
         else:
-            lines.append("Mais rapido: Nenhum disponivel")
+            lines.append("Fastest: None available")
 
         lines.append("")
-        lines.append("Por preco (crescente):")
-        for q in por_preco[:5]:
+        lines.append("By price (ascending):")
+        for q in by_price[:5]:  # Top 5
             price_val = q.get("price")
-            price_str = f"R$ {price_val:.2f}" if price_val is not None else "Indisponivel"
+            price_str = f"R$ {price_val:.2f}" if price_val is not None else "Unavailable"
             lines.append(
                 f"  - {q['provider']} - {q['service']} - "
-                f"{price_str} - {q.get('delivery_time', 'N/A')} dias"
-            )
+                f"{price_str} - {q.get('delivery_time', 'N/A')} days")
 
         lines.append("")
-        lines.append("Por prazo (crescente):")
-        for q in por_prazo[:5]:
-            time_str = f"{q.get('delivery_time', 'N/A')} dias"
+        lines.append("By delivery time (ascending):")
+        for q in by_delivery_time[:5]:  # Top 5
+            time_str = f"{q.get('delivery_time', 'N/A')} days"
             price_val = q.get("price")
-            price_str = f"R$ {price_val:.2f}" if price_val is not None else "Indisponivel"
+            price_str = f"R$ {price_val:.2f}" if price_val is not None else "Unavailable"
             lines.append(
                 f"  - {q['provider']} - {q['service']} - "
-                f"{price_str} - {time_str}"
-            )
+                f"{price_str} - {time_str}")
 
         lines.append("")
-        lines.append("Por provedor:")
-        for provider, data in por_provedor.items():
-            available_str = f"({data['available']} disponiveis)" if data['available'] > 0 else "(nao disponivel)"
+        lines.append("By provider:")
+        for provider, data in by_provider.items():
+            available_str = (
+                f"({data['available']} available)"
+                if data['available'] > 0 else "(not available)")
             lines.append(
-                f"  - {provider}: {data['total']} total {available_str}"
-            )
+                f"  - {provider}: {data['total']} total {available_str}")
 
         return "\n".join(lines)
