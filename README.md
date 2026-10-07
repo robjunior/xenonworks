@@ -53,13 +53,9 @@ The `ShippingAggregator` class aggregates quotes from multiple providers:
 - Supports price/delivery time filtering
 - Provides per-provider statistics (avg price, avg delivery, availability)
 
-## Running Tests
+## Tests
 
-```bash
-pytest
-```
-
-All 8 tests pass:
+All 8 pytest tests pass:
 - Aggregation from multiple providers ✓
 - Cheapest option identification ✓
 - Price and delivery time ordering ✓
@@ -91,30 +87,43 @@ python3 -m pytest tests/ -v
 
 This project is configured for [Scrapy Cloud](https://app.scrapycloud.com/):
 
+### 1. Get your Project ID
+1. Go to https://app.scrapycloud.com/
+2. Create a new project or select existing one
+3. Copy the **Project ID** (a number like `123456`)
+
+### 2. Configure the project
+Edit `scrapinghub.yml` and replace `YOUR_SCRAPY_CLOUD_PROJECT_ID_HERE` with your actual Project ID:
+```yaml
+project: 123456  # Replace with your actual Project ID
+requirements:
+  file: requirements.txt
+```
+
+### 3. Deploy
 ```bash
-# Install the scrapy-cloud package
+# Install scrapy-cloud
 pip install scrapy-cloud
 
-# Login to Scrapy Cloud
+# Login
 scrapyd-cloud login
 
-# Deploy the project
+# Deploy
 scrapyd-deploy
 ```
 
-The `scrapy.cfg` at the project root is already configured:
-
-```ini
-[deploy]
-project = freight_monitor
+### Alternative: Deploy with project ID via command line
+```bash
+# Without editing scrapinghub.yml
+scrapyd-deploy -p YOUR_PROJECT_ID
 ```
 
-All 5 spiders are discoverable via `scrapyd-deploy`:
-- `correios`
-- `demo`
-- `jadlog`
-- `shipping`
-- `third_party`
+### Required files for deployment
+The project includes all necessary files:
+- `requirements.txt` - Dependencies (scrapy, setuptools, wheel)
+- `setup.py` - Python package setup with Scrapy entry point
+- `scrapinghub.yml` - Project configuration (set your Project ID)
+- `scrapy.cfg` - Scrapy configuration (project = freight_monitor)
 
 ## Development
 
@@ -130,6 +139,17 @@ pytest
 
 # Verify imports work
 python3 -c "from freight_monitor.aggregator import ShippingAggregator; print('OK')"
+```
+
+## Docker
+
+```bash
+# Build and run tests in container
+docker compose up --build
+
+# Or run specific commands in container
+docker compose run freight-monitor pytest tests/
+docker compose run freight-monitor scrapy crawl correios
 ```
 
 ## License
