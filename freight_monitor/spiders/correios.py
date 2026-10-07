@@ -1,7 +1,7 @@
 # scrapy crawl correios -a origin_cep=01001-000 -a dest_cep=09000-000 -a weight=650 -a width=20 -a height=15 -a depth=10
 
 """
-Correios shipping spider for NEW_PROJECT_NAME project.
+Correios shipping spider for freight_monitor project.
 
 This spider queries Correios web interface to obtain shipping quotes
 based on origin/destination ZIP codes, weight, and dimensions.
@@ -53,7 +53,6 @@ def clean_price(value):
     """Clean and convert price string to float."""
     if value is None:
         return None
-    # Remove R$, whitespace, and replace comma with dot
     value = str(value).replace("R$", "").strip()
     value = value.replace(".", "").replace(",", ".")
     try:
@@ -66,7 +65,6 @@ def clean_delivery_time(value):
     """Clean and convert delivery time to int or None."""
     if value is None:
         return None
-    # Extract number from strings like "3 dias", "5-7 dias", etc.
     match = re.search(r"(\d+)", str(value))
     if match:
         return int(match.group(1))
@@ -87,32 +85,25 @@ class CorreiosSpider(scrapy.Spider):
     def __init__(self, origin_cep=None, dest_cep=None, weight=None, 
                  width=None, height=None, depth=None, **kwargs):
         super().__init__(**kwargs)
-        self.origin_cep = origin_cep
-        self.dest_cep = dest_cep
-        self.weight = weight
-        self.width = width
-        self.height = height
-        self.depth = depth
-        
-        # Validate required parameters
-        if not all([origin_cep, dest_cep, weight]):
-            raise ValueError(
-                "Missing required parameters: origin_cep, dest_cep, weight"
-            )
+        # Use defaults if not provided (allows spider to run without args for discovery)
+        self.origin_cep = origin_cep or "01001-000"
+        self.dest_cep = dest_cep or "09000-000"
+        self.weight = weight or "650"
+        self.width = width or "20"
+        self.height = height or "15"
+        self.depth = depth or "10"
     
     def start_requests(self):
         """Generate the initial request to Correios."""
-        # Build the Correios consultation URL
         url = "https://www.correios.com.br/sistema-web-tarifario/"
         
-        # Prepare form data
         formdata = {
             "cepOrigem": self.origin_cep.replace("-", ""),
             "cepDestino": self.dest_cep.replace("-", ""),
             "peso": str(self.weight),
-            "largura": str(self.width or 20),
-            "altura": str(self.height or 15),
-            "profundidade": str(self.depth or 10),
+            "largura": str(self.width),
+            "altura": str(self.height),
+            "profundidade": str(self.depth),
         }
         
         yield scrapy.FormRequest(
@@ -129,7 +120,6 @@ class CorreiosSpider(scrapy.Spider):
     
     def parse(self, response):
         """Parse the Correios response and extract shipping quotes."""
-        # Save raw HTML for debugging
         import os
         import json
         debug_dir = os.path.join(os.path.dirname(__file__), "..", "debug")
@@ -142,10 +132,7 @@ class CorreiosSpider(scrapy.Spider):
             debug_file, len(response.text)
         )
         
-        # Store raw HTML for debugging
         raw_html = response.text
-        
-        # Try to extract quote data from the response
         quotes = self._extract_quotes(response)
         
         for quote in quotes:
@@ -165,18 +152,12 @@ class CorreiosSpider(scrapy.Spider):
             yield loader.load_item()
     
     def _extract_quotes(self, response):
-        """Extract individual quote elements from the response.
-        
-        This method should be overridden or customized per website structure.
-        For Correios, we look for the tariff table rows.
-        """
-        # Look for the tariff table - this is Correios-specific HTML structure
+        """Extract individual quote elements from the response."""
         quotes = []
         
-        # Try to find rows in the tariff table
         rows = response.xpath(
-            '//table[contains(@class, " tabela-precos") or '
-            '//table[contains(@id, "tabela")]/tr'
+            '//table[contains(@class, "tabela-precos") or '
+            'contains(@id, "tabela")]/tr'
         )
         
         if rows:
@@ -185,8 +166,6 @@ class CorreiosSpider(scrapy.Spider):
                 cols = [c.strip() for c in cols if c.strip()]
                 
                 if len(cols) >= 5:
-                    # Typical Correios table columns:
-                    # service, price, delivery_time, etc.
                     quote_data = {
                         "service": cols[0] if len(cols) > 0 else None,
                         "price": cols[1] if len(cols) > 1 else None,
@@ -196,9 +175,7 @@ class CorreiosSpider(scrapy.Spider):
                     }
                     quotes.append(quote_data)
         
-        # If no table found, try alternative parsing
         if not quotes:
-            # Look for JSON data in the page
             json_match = re.search(
                 r'"tarifas"\s*:\s*(\[.*?\])',
                 response.text,
@@ -227,7 +204,6 @@ class CorreiosSpider(scrapy.Spider):
             exc_info=failure.value,
         )
         
-        # Yield an item indicating the service is unavailable
         yield {
             "provider": "correios",
             "service": "ERROR",
