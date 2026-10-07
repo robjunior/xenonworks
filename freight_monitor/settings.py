@@ -1,5 +1,5 @@
 import os
-# Scrapy settings for steam_monitor project
+# Scrapy settings for freight_monitor project
 #
 # For simplicity, this file only contains the most important or commonly
 # used settings. For more settings, see the documentation:
@@ -81,9 +81,9 @@ STEAM_LANGUAGE = os.getenv("STEAM_LANGUAGE", "portuguese")
 # Enable and configure downloader middlewares
 # See: https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
-    # "steam_monitor.middlewares.region.RegionMiddleware": 540,
-    # "steam_monitor.middlewares.age_gate.AgeGateMiddleware": 550,
-    # "steam_monitor.middlewares.backoff.BackoffMiddleware": 560,
+    # "freight_monitor.middlewares.region.RegionMiddleware": 540,
+    # "freight_monitor.middlewares.age_gate.AgeGateMiddleware": 550,
+    # "freight_monitor.middlewares.backoff.BackoffMiddleware": 560,
 }
 
 # --- Item Pipelines -------------------------------------------------------
@@ -92,10 +92,10 @@ DOWNLOADER_MIDDLEWARES = {
 # The pipelines down here are commented out by default; enable them as needed:
 # See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    # "steam_monitor.pipelines.validate.ValidationPipeline": 100,
-    # "steam_monitor.pipelines.normalize.NormalizePipeline": 200,
-    # "steam_monitor.pipelines.dedup.DedupPipeline": 300,
-    # "steam_monitor.pipelines.storage.StoragePipeline": 400,
+    # "freight_monitor.pipelines.validate.ValidationPipeline": 100,
+    # "freight_monitor.pipelines.normalize.NormalizePipeline": 200,
+    # "freight_monitor.pipelines.dedup.DedupPipeline": 300,
+    # "freight_monitor.pipelines.storage.StoragePipeline": 400,
 }
 
 # --- Spidermon ------------------------------------------------------------
@@ -109,7 +109,7 @@ EXTENSIONS = {
 
 # Spidermon spider close monitors
 SPIDERMON_SPIDER_CLOSE_MONITORS = (
-    "steam_monitor.monitors.SpiderCloseMonitorSuite",
+#    "freight_monitor.monitors.SpiderCloseMonitorSuite",
 )
 
 # --- Spidermon Limits -----------------------------------------------------
