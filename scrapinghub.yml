@@ -1,16 +1,4 @@
 # Scrapy Cloud project configuration
-# Option 1: Set project ID here directly (replace with your actual ID)
-# project: 123456
-
-# Option 2: Set via environment variable at deploy time
-# export SCRAPY_PROJECT_ID=123456
-# scrapyd-deploy -p $SCRAPY_PROJECT_ID
-
-# Option 3: Use scrapyd-deploy command line argument
-# scrapyd-deploy -p 123456
-
-# Default placeholder - REPLACE WITH YOUR ACTUAL PROJECT ID
-project: YOUR_SCRAPY_CLOUD_PROJECT_ID_HERE
-
+project: 880998
 requirements:
   file: requirements.txt
