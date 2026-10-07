@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  freight-monitor:
+    build: .
+    container_name: freight_monitor
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - SCRAPY_SETTINGS_MODULE=freight_monitor.settings
+    # Run tests by default
+    command: ["pytest", "tests/"]
+    # Alternative: run a specific spider
+    # command: ["scrapy", "crawl", "correios"]
+    # command: ["scrapy", "crawl", "jadlog"]
+
+# Optional: development/debugging service
+  debug:
+    build: .
+    container_name: freight-monitor-debug
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: ["bash"]
