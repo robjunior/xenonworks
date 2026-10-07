@@ -1,3 +1,5 @@
-project: SEU_ID_DO_PROJETO
+# Scrapy Cloud project configuration
+# Replace PROJECT_ID with your actual Scrapy Cloud project ID
+project: PROJECT_ID
 requirements:
   file: requirements.txt
