@@ -145,3 +145,6 @@ FEED_EXPORT_ENCODING = "utf-8"
 
 # Log level
 LOG_LEVEL = "INFO"
+
+# Spider modules
+SPIDER_MODULES = ["freight_monitor.spiders"]

@@ -5,9 +5,13 @@ description = "Scrapy project for shipping quote extraction"
 requires-python = ">=3.8"
 dependencies = []
 
+[project.entry-points.scrapy]
+settings = "freight_monitor.settings"
+
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.backends._legacy:_Backend"
 
 [tool.setuptools.packages.find]
 where = ["."]
+exclude = ["tests", "tests.*"]
