@@ -74,10 +74,10 @@ class DemoSpider(scrapy.Spider):
         loader.add_value("service", "httpbin-example")
         # Extract URL from the JSON response
         loader.add_value("price", clean_price(
-            data.json.get("url", "")
+            data.get("url", "")
         ))
         loader.add_value("delivery_time", clean_delivery_time(
-            str(data.json.get("args", {}).get("arg_url", ""))
+            str(data.get("args", {}).get("arg_url", ""))
         ))
         loader.add_value("currency", "BRL")
         loader.add_value("available", True)
