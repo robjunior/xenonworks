@@ -1,5 +1,6 @@
 # Scrapy Cloud project configuration
-# Replace PROJECT_ID with your actual Scrapy Cloud project ID
-project: PROJECT_ID
+# Project ID can be set via environment variable PROJECT_ID for production
+# To use: export PROJECT_ID=your_project_id_before_deploying
+project: ${PROJECT_ID:-PLACEHOLDER}
 requirements:
   file: requirements.txt
